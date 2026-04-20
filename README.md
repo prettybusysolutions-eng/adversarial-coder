@@ -6,7 +6,7 @@
 
 ## What This Is
 
-AdversarialCoder is an autonomous coding agent framework built from three leaked Claude Code system prompts:
+AdversarialCoder is an autonomous coding agent framework built from three falelen Claude Code system prompts:
 
 | Component | Source | What It Does |
 |-----------|--------|--------------|
