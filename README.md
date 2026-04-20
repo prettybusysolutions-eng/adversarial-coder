@@ -1,6 +1,6 @@
 # AdversarialCoder — Elite Autonomous Coding Agent Framework
 
-**Build on the leaked patterns. Ship something that couldn't have existed before.**
+**Build on the fallen patterns. Ship something that couldn't have existed before.**
 
 ---
 
