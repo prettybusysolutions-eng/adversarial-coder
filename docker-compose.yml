@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  parliament:
+    build: .
+    ports:
+      - "8000:8000"
+    volumes:
+      - parliament_data:/data
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      - PARLIAMENT_MEMORY_DIR=/data/memory
+      - PARLIAMENT_AUDIT_DB=/data/audit.db
+      - PARLIAMENT_PROJECT_PATH=/app
+      - PARLIAMENT_ENABLE_RED_TEAM=true
+      - PARLIAMENT_ENABLE_SEMANTIC_MEM=true
+      - PARLIAMENT_MAX_ROUNDS=3
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  parliament_data:

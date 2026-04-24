@@ -16,6 +16,7 @@ from typing import Optional
 
 from agent_harness import AdversarialCoder
 from agent_parliament import AgentParliament, DebateResult
+from audit_trail import AuditTrail
 
 
 class ParliamentHarness(AdversarialCoder):
@@ -36,6 +37,9 @@ class ParliamentHarness(AdversarialCoder):
         project_path: Optional[str] = None,
         api_key: Optional[str] = None,
         max_debate_rounds: int = 3,
+        enable_red_team: bool = True,
+        enable_semantic_memory: bool = True,
+        audit_db: Optional[str] = None,
     ):
         super().__init__(memory_dir=memory_dir, project_path=project_path)
 
@@ -51,7 +55,15 @@ class ParliamentHarness(AdversarialCoder):
             memory_dir=str(self.memory_dir),
             project_path=str(self.project_path),
             max_debate_rounds=max_debate_rounds,
+            enable_red_team=enable_red_team,
+            enable_semantic_memory=enable_semantic_memory,
         )
+
+        resolved_audit_db = audit_db or os.environ.get(
+            "PARLIAMENT_AUDIT_DB",
+            str(Path.home() / ".openclaw" / "parliament" / "audit.db"),
+        )
+        self.audit_trail = AuditTrail(resolved_audit_db)
 
     def execute_task(self, task: str) -> DebateResult:
         """
@@ -90,8 +102,26 @@ class ParliamentHarness(AdversarialCoder):
                 result.winning_position = "blocked"
                 result.block_reason = "VerificationSpecialist post-action probes failed"
 
-        # Step 4: Audit log
+        # Step 4: Audit log (both internal actions_log and tamper-evident chain)
         self.log_action(task, decision, result.winning_position)
+
+        red_team = getattr(result, "red_team_report", None)
+        self.audit_trail.record(
+            session_id=self.session_id,
+            action="deliberate",
+            actor="AgentParliament",
+            outcome=result.winning_position.upper(),
+            task=task,
+            details={
+                "compute_tier": result.compute_tier,
+                "rounds": len(result.rounds),
+                "block_reason": result.block_reason,
+                "red_team_threat_level": red_team.threat_level if red_team else "N/A",
+                "tokens": result.total_input_tokens + result.total_output_tokens,
+                "formal_passed": [fr.tool for fr in result.formal_results if fr.passed],
+                "formal_failed": [fr.tool for fr in result.formal_results if not fr.passed],
+            },
+        )
 
         return result
 
@@ -160,6 +190,13 @@ class ParliamentHarness(AdversarialCoder):
                 print("\nCommands to run:")
                 for cmd in commands:
                     print(f"  $ {cmd}")
+
+        red_team = getattr(result, "red_team_report", None)
+        if red_team:
+            icon = "🔴" if red_team.is_critical else ("🟡" if red_team.threat_level == "WARNING" else "🟢")
+            print(f"\n  Red Team: {icon} {red_team.threat_level} — {red_team.summary}")
+            for v in red_team.high_severity:
+                print(f"    [{v.severity}] {v.category}: {v.description}")
 
         if result.formal_results:
             print()

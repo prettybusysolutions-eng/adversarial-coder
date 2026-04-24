@@ -1,12 +1,14 @@
 """
 agent_parliament.py — Self-organizing adversarial agent parliament.
 
-Four constitutional roles challenge each other's outputs. Consensus requires
-surviving formal verification — not just peer agreement.
+Five constitutional roles challenge each other's outputs. Consensus requires
+surviving formal verification AND Red Team adversarial probing — not just
+peer agreement.
 
 The "frontier without hardware" insight: adversarial constitutional pressure +
-formal verification ground truth + persistent collective memory = emergent
-reliability that exceeds any single small model's output.
+Red Team exploitation probing + formal verification ground truth +
+semantic collective memory = emergent reliability that exceeds any single
+small model's output, improving over time without retraining.
 """
 
 from __future__ import annotations
@@ -19,6 +21,19 @@ from typing import Optional
 
 from parliament_tools import AnthropicClient, FormalVerifier, ToolResult
 from security_monitor import SecurityMonitor
+
+# Optional elite components — graceful degradation if not installed
+try:
+    from red_team import RedTeamAgent, RedTeamReport
+    _RED_TEAM_AVAILABLE = True
+except ImportError:
+    _RED_TEAM_AVAILABLE = False
+
+try:
+    from semantic_memory import SemanticMemory
+    _SEMANTIC_MEMORY_AVAILABLE = True
+except ImportError:
+    _SEMANTIC_MEMORY_AVAILABLE = False
 
 
 # ── Role system prompt constants ─────────────────────────────────────────────
@@ -167,6 +182,7 @@ class DebateResult:
     formal_results: list[ToolResult] = field(default_factory=list)
     total_input_tokens: int = 0
     total_output_tokens: int = 0
+    red_team_report: Optional[object] = field(default=None, repr=False)  # RedTeamReport | None
 
 
 # ── AgentParliament ───────────────────────────────────────────────────────────
@@ -178,7 +194,11 @@ class AgentParliament:
     Compute tiers:
       single     — Implementer only. Read-only tasks, simple queries.
       dual       — Implementer + Critic. Code changes.
-      parliament — All 4 agents + formal verification. Features, security, architecture.
+      parliament — All 5 agents + formal verification. Features, security, architecture.
+
+    Elite additions (opt-in, gracefully degrade if unavailable):
+      enable_red_team       — 5th agent probes for exploitable vulnerabilities
+      enable_semantic_memory — vector memory replaces regex+markdown memory
     """
 
     def __init__(
@@ -187,6 +207,8 @@ class AgentParliament:
         memory_dir: str,
         project_path: str,
         max_debate_rounds: int = 3,
+        enable_red_team: bool = True,
+        enable_semantic_memory: bool = True,
     ):
         self.client = AnthropicClient(api_key=api_key)
         self.formal_verifier = FormalVerifier()
@@ -199,6 +221,18 @@ class AgentParliament:
         from dream_consolidation import DreamConsolidation
         self._dream = DreamConsolidation(memory_dir)
         self._memory_context = self._dream.get_memory_context()
+
+        # Red Team — 5th constitutional adversarial agent
+        self._red_team: Optional[RedTeamAgent] = None
+        if enable_red_team and _RED_TEAM_AVAILABLE:
+            self._red_team = RedTeamAgent(self.client)
+
+        # Semantic memory — vector-based collective knowledge store
+        self._semantic_memory: Optional[SemanticMemory] = None
+        if enable_semantic_memory and _SEMANTIC_MEMORY_AVAILABLE:
+            self._semantic_memory = SemanticMemory(
+                persist_dir=str(Path(memory_dir) / "semantic")
+            )
 
     def deliberate(self, task: str) -> DebateResult:
         """Main entry point. Routes to the appropriate compute tier."""
@@ -384,8 +418,22 @@ class AgentParliament:
 
         final_out = rounds[-1].implementer_output
 
-        # Architect review — runs once after debate concludes
+        # Architect review — structural soundness (runs once after debate)
         architect_out = self._run_architect(task, final_out)
+
+        # Red Team — 5th constitutional agent: adversarial exploitation probing
+        red_team_report: Optional[RedTeamReport] = None
+        if self._red_team:
+            red_team_report = self._red_team.probe(task, final_out)
+            if red_team_report.is_critical:
+                result = self._make_blocked(
+                    task, "parliament",
+                    f"Red Team CRITICAL: {red_team_report.summary}",
+                )
+                result.red_team_report = red_team_report
+                if self._semantic_memory:
+                    self._semantic_memory.store_debate_outcome(result, self._dream.memory_dir.name)
+                return result
 
         # Formal verification — deterministic ground truth
         formal_results = self.formal_verifier.verify_all(self.project_path)
@@ -409,7 +457,6 @@ class AgentParliament:
             )
         else:
             block_reason = ""
-            # UNSOUND architect verdict is a warning, not a block
 
         result = DebateResult(
             task=task,
@@ -422,6 +469,11 @@ class AgentParliament:
             total_input_tokens=self.client.total_input_tokens,
             total_output_tokens=self.client.total_output_tokens,
         )
+        result.red_team_report = red_team_report
+
+        if self._semantic_memory:
+            self._semantic_memory.store_debate_outcome(result, self._dream.memory_dir.name)
+
         self._session_transcript.append(self._build_summary(result))
         return result
 
@@ -433,7 +485,7 @@ class AgentParliament:
         round_number: int = 1,
         previous_critique: Optional[dict] = None,
     ) -> dict:
-        system = self._inject_memory(IMPLEMENTER_SYSTEM_PROMPT)
+        system = self._inject_memory(IMPLEMENTER_SYSTEM_PROMPT, task=task)
 
         messages: list[dict] = [{"role": "user", "content": f"Task: {task}"}]
         if previous_critique:
@@ -504,13 +556,15 @@ class AgentParliament:
 
     # ── Helpers ───────────────────────────────────────────────────────────────
 
-    def _inject_memory(self, system_prompt: str) -> str:
-        if not self._memory_context:
-            return system_prompt
-        return (
-            f"{system_prompt}\n\n"
-            f"## Collective Memory (from past sessions)\n{self._memory_context}"
-        )
+    def _inject_memory(self, system_prompt: str, task: Optional[str] = None) -> str:
+        parts = [system_prompt]
+        if self._memory_context:
+            parts.append(f"## Collective Memory (from past sessions)\n{self._memory_context}")
+        if self._semantic_memory and task:
+            semantic_ctx = self._semantic_memory.get_context_for_task(task)
+            if semantic_ctx:
+                parts.append(semantic_ctx)
+        return "\n\n".join(parts)
 
     def _extract_challenges_from_critic(self, critic_out: dict) -> list[Challenge]:
         return [
@@ -573,4 +627,7 @@ class AgentParliament:
             high = [c for c in round_.challenges if c.severity == "HIGH"]
             if high:
                 lines.append(f"Round {round_.round_number} HIGH challenges: {len(high)}")
+        red_team = getattr(result, "red_team_report", None)
+        if red_team:
+            lines.append(f"Red Team: {red_team.threat_level} — {red_team.summary}")
         return "\n".join(lines)
