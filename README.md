@@ -1,8 +1,13 @@
-# AdversarialCoder — Elite Autonomous Coding Agent Framework
+# Adversarial Coder
 
-**Build on the fallen patterns. Ship something that couldn't have existed before.**
+A coding framework built around restraint, verification, and failure discovery.
 
----
+Adversarial Coder is for environments where code generation alone is not enough and every serious claim needs pressure testing.
+
+## Core posture
+Guard first.
+Verify second.
+Claim last.
 
 ## What This Is
 
