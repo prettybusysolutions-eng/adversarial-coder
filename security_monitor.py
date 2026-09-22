@@ -60,7 +60,7 @@ BLOCK_CONDITIONS = {
         "severity": "HIGH",
     },
     "external_code_execution": {
-        "pattern": r"curl\s+\|\s*bash|sh\s+<(?:curl|wget)|pip\s+install\s+(?!-r\s)",
+        "pattern": r"(?:curl|wget)\b[^|\n]*\|\s*(?:bash|sh)\b|(?:bash|sh)\s+<(?:curl|wget)|pip\s+install\s+(?!-r\s)",
         "description": "Downloading and executing code from external sources",
         "severity": "HIGH",
     },
