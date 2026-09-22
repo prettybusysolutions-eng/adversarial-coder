@@ -4,6 +4,10 @@ A coding framework built around restraint, verification, and failure discovery.
 
 Adversarial Coder is for environments where code generation alone is not enough and every serious claim needs pressure testing.
 
+**Start here:** [run the five-minute quickstart](QUICKSTART.md).
+
+Release status and gates: [RELEASING.md](RELEASING.md).
+
 ## Core posture
 Guard first.
 Verify second.
@@ -11,7 +15,8 @@ Claim last.
 
 ## What This Is
 
-AdversarialCoder is an autonomous coding agent framework built from three falelen Claude Code system prompts:
+Adversarial Coder is a small Python framework for composing pre-action safety
+checks, post-action verification, and between-session memory consolidation.
 
 | Component | Source | What It Does |
 |-----------|--------|--------------|
@@ -23,9 +28,8 @@ AdversarialCoder is an autonomous coding agent framework built from three falele
 
 ## Why This Matters
 
-Claude Code's internal architecture was leaked because an Anthropic employee's GitHub repo went public. The most valuable parts weren't the source code — they were the **system prompts** that govern how the agent behaves.
-
-The key insight: **an elite autonomous agent needs an immune system and an adversarial tester.**
+The core design claim is testable: an autonomous coding loop is safer when
+execution policy and independent verification are separate components.
 
 - Without SecurityMonitor: agents can be manipulated into destructive actions via prompt injection
 - Without VerificationSpecialist: agents claim success without actually verifying
@@ -38,6 +42,7 @@ This framework makes those patterns available as composable Python components.
 ## Installation
 
 ```bash
+git clone https://github.com/prettybusysolutions-eng/adversarial-coder.git
 cd adversarial-coder
 pip install -e .
 ```
@@ -51,7 +56,7 @@ Requirements:
 ## Quick Start
 
 ```python
-from adversarial_coder import AdversarialCoder
+from agent_harness import AdversarialCoder
 
 agent = AdversarialCoder(
     memory_dir="~/.openclaw/workspace-aurex/memory",
@@ -82,7 +87,7 @@ results = agent.run_dream_consolidation()
 Pre-action security guard. Evaluates any action against BLOCK/ALLOW rules.
 
 ```python
-from adversarial_coder.security_monitor import SecurityMonitor
+from security_monitor import SecurityMonitor
 
 monitor = SecurityMonitor()
 
@@ -115,7 +120,7 @@ summary = monitor.summary(decisions)
 Post-action adversarial testing framework.
 
 ```python
-from adversarial_coder.verification_specialist import VerificationSpecialist
+from verification_specialist import VerificationSpecialist
 
 vs = VerificationSpecialist()
 vs.scan_transcript(transcript_text)
@@ -157,7 +162,7 @@ print(report.final_verdict())  # VERDICT: PASS | FAIL | PARTIAL
 Between-session memory merging.
 
 ```python
-from adversarial_coder.dream_consolidation import DreamConsolidation
+from dream_consolidation import DreamConsolidation
 
 dream = DreamConsolidation(
     memory_dir="~/.openclaw/workspace-aurex/memory"
@@ -268,4 +273,4 @@ v0.1 — Core components implemented
 
 ---
 
-**Built with leaked patterns. Ship something that couldn't have existed before.**
+**Guard first. Verify second. Claim last.**
