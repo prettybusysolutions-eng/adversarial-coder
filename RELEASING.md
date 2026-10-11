@@ -31,3 +31,6 @@ use the recorded commit to retrieve the same source later.
 This is a tested source snapshot, not a published versioned release or evidence
 that untested integrations work. Release publication and registry verification
 remain separate gates.
+
+
+Verification truth-boundary regression suite is mandatory: missing adapters and commands must remain PARTIAL; known failed commands and duplicate effects must produce FAIL. A local command runner is not isolation evidence.
