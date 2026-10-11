@@ -274,3 +274,12 @@ v0.1 — Core components implemented
 ---
 
 **Guard first. Verify second. Claim last.**
+
+
+## Verification boundary
+
+Target probes require explicit `target_adapter`, `state_observer` and `probe_oracle` callables. The adapter performs the real call; the observer supplies actual before/after state; the oracle checks the domain invariant and returns a boolean. Missing or unreachable evidence yields `PARTIAL`. Failed commands or observed invariant violations yield `FAIL`. Response equality alone does not establish idempotency or concurrency correctness.
+
+Command execution in this library is for operator-selected trusted local repositories. It is not a command sandbox. Hosted callers must inject an isolated `command_runner`; the default library runner must never execute untrusted projects on a privileged host.
+
+Run `python -m unittest discover -s tests -v` to exercise failed commands, missing targets, incomplete evidence and duplicate side effects. These are internally authored regression tests, not independent certification.
